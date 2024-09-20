@@ -8,17 +8,12 @@ __author__ = "Abraham Gonzalez Castillo Pena"
 __title__ = "Arnold AOV's Comp"
 __version__ = '1.0.0'
 
-try:
-    parent = QApplication.activeWindow()
-except:
-    print("Error initializing window parent")
-
 class AOVs_Creator_Window(QMainWindow):
     """QMainWindow which can be open as a standalone tool"""
 
-    def __init__(self, parent=parent):
+    def __init__(self):
         """Load UI from file"""
-        super(self.__class__, self).__init__(parent)
+        super(self.__class__, self).__init__(QApplication.activeWindow())
 
         # LOAD UI
         self.current_dir = os.path.dirname(os.path.realpath(__file__))
@@ -44,4 +39,8 @@ class AOVs_Creator_Window(QMainWindow):
         self.close()
 
 def main():
+    if QApplication.instance():
+        for win in (QApplication.allWindows()):
+            if "ArnoldAOVCompWindow" in win.objectName():
+                win.destroy()
     AOVs_Creator_Window()
