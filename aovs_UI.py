@@ -1,4 +1,3 @@
-import nuke
 import os
 from PySide2.QtGui import *
 from PySide2.QtCore import *
@@ -24,17 +23,25 @@ class AOVs_Creator_Window(QMainWindow):
         # LOAD UI
         self.current_dir = os.path.dirname(os.path.realpath(__file__))
         ui_main = '{}/UI/UI_arnold_aov_comp.ui'.format(self.current_dir)
-        ui_loader = QtUiTools.QUiLoader().load(ui_main)
-        ui_loader.setParent(self)
-        # ui_file = QFile(ui_main)
-        # ui_file.open(QFile.ReadOnly)
-        # self.ui = ui_loader.load(ui_file)
-        # ui_file.close()
+        self.widget = QtUiTools.QUiLoader().load(ui_main)
+        self.widget.setParent(self)
+        self.setWindowTitle('{0} v{1}'.format(__title__, __version__))
+        self.resize(305,56)
+        self.activateWindow
+        self.widget.btn_create.clicked.connect(self.create_template)
         self.show()
+
+    def create_template(self):
+        """
+         Build a template for the selected read nodes
+        """
+        from .utilities.btn_actions import run_create
+        template_type = self.widget.cBox_template.currentText()
+        new_group = self.widget.chBox_new_group.checkState()
+        run_create(template_type, new_group)
 
     def close_window(self):
         self.close()
 
 def main():
-    print('test')
     AOVs_Creator_Window()
