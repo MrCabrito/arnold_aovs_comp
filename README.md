@@ -8,9 +8,15 @@ Install Arnold AOV Tool in nuke.
 
 1. Close Nuke
 
-2. Copy all the folder into the .nuke folder.
+2. Download the Win RAR file.
 
-3. Inside the .nuke folder create a file with the name menu.py or if it exists open it and add the next three lines:
+3. Uncompress the Win RAR file.
+
+4. Copy the uncompressed folder into the .nuke folder, that is found inside the user folder.
+
+5. Open or create a file called menu.py inside the .nuke folder.
+
+6. Inside the file add the next lines:
 
 ```python
   import arnold_aovs_comp.aovs_UI
@@ -18,7 +24,7 @@ Install Arnold AOV Tool in nuke.
   toolbar.addCommand('AOVs', 'arnold_aovs_comp.aovs_UI.main()')
 ```
 
-4. Open Nuke, you will get a button in the side menu or in the tab menu you can find it with the name AOVs
+6. Open Nuke, you will get a button in the side menu or in the tab menu you can find it with the name AOVs
 
 ## Authors
 
