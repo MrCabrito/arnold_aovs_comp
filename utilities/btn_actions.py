@@ -24,7 +24,7 @@ def run_create(template_type: str, new_group: bool) -> None:
     # Builds the template and starts the progress bar
     for read_node, layers_found in read_data.items():
         task = create_progress_task('Building {} Template'.format(template_type))
-        build_comp(layers_found, read_node, task, new_group)
+        build_up(layers_found, read_node, task, new_group)
         progress = int(progPerRead + progress)
         task.setProgress(progress)
         if task.isCancelled():
@@ -41,7 +41,8 @@ def template_selection(template_type: str) -> dict:
     """
     if template_type == 'Simple':
         layers_dict = {'General': ['direct', 'albedo', 'indirect'],
-                       'Emission':['emission']}
+                       'Emission':['emission'],
+                       'Shadow':['shadow_matte']}
     elif template_type == 'Intermediate':
         layers_dict = {'Diffuse': ['diffuse', 'diffuse_albedo'],
                        'SSS':['sss', 'sss_albedo'],
@@ -49,7 +50,8 @@ def template_selection(template_type: str) -> dict:
                        'Specular':['specular', 'specular_albedo'],
                        'Coat':['coat', 'coat_albedo'],
                        'Sheen':['sheen', 'sheen_albedo'],
-                       'Emission':['emission']}
+                       'Emission':['emission'],
+                       'Shadow':['shadow_matte']}
     elif template_type == 'Complex':
         layers_dict = {'Diffuse': ['diffuse_direct', 'diffuse_albedo', 'diffuse_indirect'],
                        'SSS':['sss_direct', 'sss_albedo', 'sss_indirect'],
@@ -57,13 +59,14 @@ def template_selection(template_type: str) -> dict:
                        'Specular':['specular_direct', 'specular_albedo', 'specular_indirect'],
                        'Coat':['coat_direct', 'coat_albedo', 'coat_indirect'],
                        'Sheen':['sheen_direct', 'sheen_albedo', 'sheen_indirect'],
-                       'Emission':['emission']}
+                       'Emission':['emission'],
+                       'Shadow':['shadow_matte']}
     return layers_dict
 
 
-def build_comp(layers_dict: dict, read_node, progress_bar, new_group: bool) -> None:
+def build_up(layers_dict: dict, read_node, progress_bar, new_group: bool) -> None:
     """
-     Start building the template with the selected options.
+     Wrapper to start building the template with a group or in direct in the workspace.
 
      @layers_dict: dict - A dictionary that contains all the AOV's in groups.
      @read_node: Nuke Node - A read node from nuke, to get specific information.
@@ -72,38 +75,39 @@ def build_comp(layers_dict: dict, read_node, progress_bar, new_group: bool) -> N
 
      @return None.
     """
-    from .nuke_helper import (create_group, create_input, create_output, get_all_groups_names, get_node_by_name, delete_node)
+    from .nuke_helper import (create_group, create_input, create_output, get_all_groups_names)
     # Verify for group nodes that has similar names to delete or create a new one
     if new_group:
-        group_names = get_all_groups_names()
-        next_seq = 1
-        seq_group = [int(group_name.split(' ')[-1]) for group_name in group_names if read_node['name'].value() in group_name]
-        if seq_group:
-            next_seq = max(seq_group) + 1
-        group_node = create_group(read_node['name'].value(), next_seq)
+        build_group(layers_dict, read_node, progress_bar)
     else:
-        check_node = get_node_by_name('{} Group 1'.format(read_node['name'].value()))
-        if check_node:
-            delete_node(check_node)
-        group_node = create_group(read_node['name'].value())
+        node = build_comp(layers_dict, read_node, progress_bar)
+
+
+def build_group(layers_dict: dict, read_node, progress_bar) -> None:
+    """
+     Start building the template inside the group.
+
+     @layers_dict: dict - A dictionary that contains all the AOV's in groups.
+     @read_node: Nuke Node - A read node from nuke, to get specific information.
+     @progress_bar: Progress Bar - Progress bar created in Nuke to update messages.
+
+     @return None.
+    """
+    from .nuke_helper import (create_group, create_input, create_output, get_all_groups_names)
+    group_names = get_all_groups_names()
+    next_seq = 1
+    seq_group = [int(group_name.split(' ')[-1]) for group_name in group_names if read_node['name'].value() in group_name]
+    if seq_group:
+        next_seq = max(seq_group) + 1
+    group_node = create_group(read_node['name'].value(), next_seq)
     # Starts creating the template inside the group
     with group_node:
         input_node = create_input()
         # Set the position of the input, to go around the bug of not setting the template correctly
         input_node['xpos'].setValue(0)
         input_node['ypos'].setValue(0)
-        # Set the first node of the template an unpremult
-        progress_bar.setMessage('Creating the unpremult')
-        unpremult_node = build_unpremult(input_node, read_node['name'].value())
-        # Start building all the AOV's found for the template
-        progress_bar.setMessage('Building the passes')
-        passes_merge, emission_node = build_layers(layers_dict, unpremult_node)
-        # Creates all the merges from all the passes to get the beauty again
-        progress_bar.setMessage('Building the beauty')
-        last_merge = build_beauty(passes_merge, emission_node)
-        # Copy the alpha from the original render
-        progress_bar.setMessage('Copying the alpha')
-        last_node = build_copy_alpha(unpremult_node, last_merge, read_node)
+        # Start building comp
+        last_node = build_comp(layers_dict, read_node, progress_bar, input_node)
         # Creates the Output
         output_node = create_output()
         output_node.setInput(0, last_node)
@@ -113,7 +117,35 @@ def build_comp(layers_dict: dict, read_node, progress_bar, new_group: bool) -> N
     group_node.setInput(0, read_node)
     group_node['xpos'].setValue(read_node['xpos'].value())
     group_node['ypos'].setValue(read_node['ypos'].value()+100)
-    
+
+def build_comp(layers_dict: dict, read_node, progress_bar, input_node = None) -> None:
+    """
+     Start building the template with the selected options.
+
+     @layers_dict: dict - A dictionary that contains all the AOV's in groups.
+     @read_node: Nuke Node - A read node from nuke, to get specific information.
+     @progress_bar: Progress Bar - Progress bar created in Nuke to update messages.
+     @input_node: Node|None -Default value as None if there is no input node and uses the read node otherwise uses the input node given.
+
+     @return None.
+    """
+    if not input_node:
+        input_node = read_node
+    # Set the first node of the template an unpremult
+    progress_bar.setMessage('Creating the unpremult')
+    unpremult_node = build_unpremult(input_node, read_node['name'].value())
+    # Start building all the AOV's found for the template
+    progress_bar.setMessage('Building the AOVs')
+    passes_merge, emission_node = build_layers(layers_dict, unpremult_node)
+    # Creates all the merges from all the passes to get the beauty again
+    progress_bar.setMessage('Building the beauty')
+    last_merge = build_beauty(passes_merge, emission_node)
+    # Copy the alpha from the original render
+    progress_bar.setMessage('Copying the alpha')
+    copy_node, dot_node = build_copy_alpha(unpremult_node, last_merge, read_node)
+    shadow_node = build_shadow_matte(layers_dict, copy_node, dot_node, read_node)
+    last_node = build_premult(shadow_node, read_node)
+    return last_node
 
 def build_unpremult(start_node, name: str):
     """
@@ -153,6 +185,8 @@ def build_layers(layers_dict: dict, top_node):
     for group, layers in layers_dict.items():
         all_merge_nodes = list()
         backdrop_layers = list()
+        if 'Shadow' in group:
+            continue
         for layer in layers:
             # Deselects nodes to prevent not wanted connections
             deselect_nodes()
@@ -168,7 +202,7 @@ def build_layers(layers_dict: dict, top_node):
                 all_merge_nodes.extend(merge_nodes)
                 backdrop_layers.append(backdrop_node)
             # Create a new offset for the dots that connects
-            dot_layers_offset_x = 199
+            dot_layers_offset_x = backdrop_node['bdwidth'].value() + 50
             dot_layers_offset_y = 0
         # Connects all the merges to get the global lighting for comp and recreate the AOV
         for merge_node in all_merge_nodes:
@@ -202,7 +236,7 @@ def build_beauty(passes_merge: list, emission_node):
         merge_node = create_merge(pass_name, 'plus')
         dot_node = create_dot(pass_name)
         merge_node['xpos'].setValue(last_merge['xpos'].value())
-        merge_node['ypos'].setValue(last_merge['ypos'].value()+60)
+        merge_node['ypos'].setValue(last_merge['ypos'].value()+80)
         dot_node['xpos'].setValue(passes_merge[index]['xpos'].value()+34)
         dot_node['ypos'].setValue(merge_node['ypos'].value()+9)
         merge_node.setInput(0, last_merge)
@@ -235,7 +269,7 @@ def build_copy_alpha(unpremult_node, last_merge, read_node):
 
      @return A Nuke node the unpremult node
     """
-    from .nuke_helper import (create_dot, create_copy, create_premult, deselect_nodes)
+    from .nuke_helper import (create_dot, create_copy)
     dot_copy_1 = create_dot()
     dot_copy_1.setInput(0, unpremult_node)
     dot_copy_1['xpos'].setValue(unpremult_node['xpos'].value()-120)
@@ -249,10 +283,56 @@ def build_copy_alpha(unpremult_node, last_merge, read_node):
     copy_node.setInput(1, dot_copy_2)
     copy_node['xpos'].setValue(dot_copy_2['xpos'].value()+120)
     copy_node['ypos'].setValue(last_merge['ypos'].value()+60)
+    return copy_node, dot_copy_2
+
+
+def build_shadow_matte(layers_dict: dict, top_node, dot_node, read_node):
+    """
+     Build the tree for the Shadow Matte AOV.
+
+     @layers_dict: dict - Dictionary with all the layers founded in the read node.
+     @top_node: Nuke node - The starting node to connect the grade.
+     @dot_node: Nuke node - The dot node to get the Shadow AOV.
+     @read_node: Nuke node - The original read node to get the name.
+
+     @return Nuke Node.
+    """
+    from .nuke_helper import (shuffle_aov, select_nodes, create_backdrops, backdrop_wh_nodes, create_grade, deselect_nodes)
+    deselect_nodes()
+    if not layers_dict.get('Shadow'):
+        return top_node
+    layer = layers_dict.get('Shadow')
+    shuffle_node = shuffle_aov(layer[0])
+    shuffle_node.setInput(0, dot_node)
+    shuffle_node['xpos'].setValue(dot_node['xpos'].value()-34)
+    shuffle_node['ypos'].setValue(dot_node['ypos'].value()+130)
+    shuffle_node["mappings"].setValue('shadow_matte.red', 'rgba.alpha')
+    grade_node = create_grade(read_node['name'].value())
+    grade_node.setInput(0, top_node)
+    grade_node.setInput(grade_node.minInputs()-1, shuffle_node)
+    grade_node['xpos'].setValue(top_node['xpos'].value())
+    grade_node['ypos'].setValue(top_node['ypos'].value()+168)
+    nodes_to_select = [shuffle_node, grade_node]
+    select_nodes(nodes_to_select)
+    width, height = backdrop_wh_nodes(nodes_to_select)
+    backdrop_node = create_backdrops(width, height, 'Shadow')
+    return grade_node
+    
+
+def build_premult(top_node, read_node):
+    """
+     Build the tree to break the AOV.
+
+     @top_node: Nuke node - A nuke node to get the position to start building.
+     @read_node: str - The original read node to get the name.
+
+     @return Nuke Node.
+    """
+    from .nuke_helper import (create_premult, deselect_nodes)
     premult_node = create_premult(read_node['name'].value())
-    premult_node.setInput(0, copy_node)
-    premult_node['xpos'].setValue(copy_node['xpos'].value())
-    premult_node['ypos'].setValue(copy_node['ypos'].value()+120)
+    premult_node.setInput(0, top_node)
+    premult_node['xpos'].setValue(top_node['xpos'].value())
+    premult_node['ypos'].setValue(top_node['ypos'].value()+120)
     deselect_nodes()
     return premult_node
 
@@ -266,7 +346,7 @@ def build_aov(node_to_connect, layer: str, x_offset: int, y_offset: int):
      @x_offset: int - Offset in X for the dot node.
      @ y_offset: int - Offset in Y for the dot node.
 
-     @return Tuple dot node to get the top position, merge nodes to break the AOV for the global lighting and recreate, backdrop node to create the group backdrop
+     @return Tuple dot node to get the top position, merge nodes to break the AOV for the global lighting and recreate, backdrop node to create the group backdrop.
     """
     from .nuke_helper import (create_dot, shuffle_aov, create_remove, create_mergeExpression,
                           create_mergePass, select_nodes, create_backdrops, backdrop_wh_nodes)
@@ -293,12 +373,12 @@ def build_aov(node_to_connect, layer: str, x_offset: int, y_offset: int):
     merge_node = create_mergePass(layer)
     merge_node.setInput(0, merge_expression_node)
     merge_node['xpos'].setValue(merge_expression_node['xpos'].value())
-    merge_node['ypos'].setValue(merge_expression_node['ypos'].value()+80)
+    merge_node['ypos'].setValue(merge_expression_node['ypos'].value()+400)
     # Select node to create the backdrop and get the width and height
     nodes_to_select = [shuffle_node, remove_node, merge_expression_node, merge_node]
     select_nodes(nodes_to_select)
     width, height = backdrop_wh_nodes(nodes_to_select)
-    backdrop_node = create_backdrops(width=width, height=height, label=layer, font_size=25)
+    backdrop_node = create_backdrops(width=width+200, height=height, label=layer, font_size=25)
     # List of the merge nodes for connection with the albedo
     merge_nodes = [merge_expression_node, merge_node]
     return dot_node, merge_nodes, backdrop_node
@@ -313,7 +393,7 @@ def build_albedo(node_to_connect, layer:str, x_offset: int, y_offset: int):
      @x_offset: int - Offset in X for the dot node.
      @ y_offset: int - Offset in Y for the dot node.
 
-     @return Tuple dot node to get the top position, dot albedo nodes to connect to the merge to break and recreate the AOV, backdrop node to create the group backdrop
+     @return Tuple dot node to get the top position, dot albedo nodes to connect to the merge to break and recreate the AOV, backdrop node to create the group backdrop.
     """
     from .nuke_helper import (create_dot, shuffle_aov, create_remove, select_nodes, create_backdrops, backdrop_wh_nodes)
     dot_node = create_dot()
@@ -339,7 +419,7 @@ def build_albedo(node_to_connect, layer:str, x_offset: int, y_offset: int):
     dot_merge_node = create_dot()
     dot_merge_node.setInput(0, dot_expression_node)
     dot_merge_node['xpos'].setValue(dot_expression_node['xpos'].value())
-    dot_merge_node['ypos'].setValue(dot_expression_node['ypos'].value()+80)
+    dot_merge_node['ypos'].setValue(dot_expression_node['ypos'].value()+400)
     # Select node to create the backdrop and get the width and height
     nodes_to_select = [shuffle_node, remove_node, dot_expression_node, dot_merge_node]
     select_nodes(nodes_to_select)
@@ -359,7 +439,7 @@ def build_emission(node_to_connect, layer:str, x_offset: int, y_offset: int):
      @x_offset: int - Offset in X for the dot node.
      @ y_offset: int - Offset in Y for the dot node.
 
-     @return Tuple remove node to get the position of the last node for emission, backdrop node to create the group backdrop
+     @return Tuple remove node to get the position of the last node for emission, backdrop node to create the group backdrop.
     """
     from .nuke_helper import (create_dot, shuffle_aov, create_remove, select_nodes, create_backdrops, backdrop_wh_nodes)
     dot_node = create_dot()
