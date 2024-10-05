@@ -88,5 +88,5 @@ class Ui_Form(object):
         self.cBox_template.setItemText(0, _translate("Form", "Simple"))
         self.cBox_template.setItemText(1, _translate("Form", "Intermediate"))
         self.cBox_template.setItemText(2, _translate("Form", "Complex"))
-        self.chBox_new_group.setText(_translate("Form", "Create a new group"))
+        self.chBox_new_group.setText(_translate("Form", "Create a group"))
         self.btn_create.setText(_translate("Form", "Ok"))

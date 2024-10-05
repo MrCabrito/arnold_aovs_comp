@@ -136,7 +136,7 @@
          </sizepolicy>
         </property>
         <property name="text">
-         <string>Create a new group</string>
+         <string>Create a group</string>
         </property>
        </widget>
       </item>
