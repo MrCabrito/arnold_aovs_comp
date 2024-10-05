@@ -155,6 +155,19 @@ def create_unpremult(name: str):
     return unpremult_node
 
 
+def create_grade(name:str):
+    """
+     Creates a grade node.
+
+     @name: str - The name for the node
+
+     @return Nuke node.
+    """
+    grade_node = nuke.nodes.Grade()
+    grade_node['name'].setValue('{}_Grade'.format(name))
+    return grade_node
+
+
 def shuffle_aov(layer: str):
     """
      Creates a shuffle node with the specific AOV.
@@ -306,7 +319,7 @@ def backdrop_wh_nodes(nodes_enclosed: list) -> tuple:
         xpos_list.append(node['xpos'].value())
         ypos_list.append(node['ypos'].value())
     width = max(xpos_list) - min(xpos_list) + 99
-    height = max(ypos_list) - min(ypos_list) + 115
+    height = max(ypos_list) - min(ypos_list) + 130
     return width, height
 
 
@@ -327,9 +340,10 @@ def backdrop_wh_backdrops(selected_backdrops: list) -> tuple:
         ypos_list.append(node['ypos'].value())
         bdwidth_list.append(node['bdwidth'].value())
         bdheight_list.append(node['bdheight'].value())
-    width = max(xpos_list) - min(xpos_list) + 120
+    extra_width = int(((max(xpos_list) - min(xpos_list)))*((len(xpos_list)-1)/len(xpos_list)))
+    width = max(xpos_list) - min(xpos_list) + extra_width
     height = max(ypos_list) - min(ypos_list)
-    if width == 120:
+    if width == extra_width:
         width = max(bdwidth_list) + 120
     if not height:
         height = max(bdheight_list) + 85
