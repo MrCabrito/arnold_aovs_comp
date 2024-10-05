@@ -20,6 +20,7 @@ class AOVs_Creator_Window(QMainWindow):
         ui_main = '{}/UI/UI_arnold_aov_comp.ui'.format(self.current_dir)
         self.widget = QtUiTools.QUiLoader().load(ui_main)
         self.widget.setParent(self)
+        self.setObjectName("ArnoldAOVCompWindow")
         self.setWindowTitle('{0} v{1}'.format(__title__, __version__))
         self.resize(305,56)
         self.activateWindow
