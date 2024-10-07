@@ -24,7 +24,7 @@ Install Arnold AOV Tool in nuke.
   toolbar.addCommand('AOVs', 'arnold_aovs_comp.aovs_UI.main()')
 ```
 
-6. Open Nuke, you will get a button in the side menu or in the tab menu you can find it with the name AOVs
+7. Open Nuke, you will get a button in the side menu or in the tab menu you can find it with the name AOVs
 
 ## Authors
 
